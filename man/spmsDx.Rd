@@ -2,7 +2,7 @@
 % Please edit documentation in R/spmsDx.R
 \name{spmsDx}
 \alias{spmsDx}
-\title{Diagnosis of secondary progressive multiple sclerosis}
+\title{Identification of secondary progressive multiple sclerosis}
 \usage{
 spmsDx(
   visits,
@@ -15,25 +15,28 @@ spmsDx(
 )
 }
 \arguments{
-\item{visits}{A data frame consisting of 12 columns: ID, dateEDSS, EDSS, FSpyr (pyramidal FSS), FScrbl (Cerebellar FSS), FSbstem (Brainstem FSS), FSsens (Sensory FSS), FSsph (Bowel Bladder FSS), FSvis (Visual FSS), FScereb (Cerebral FSS), FSamb (Ambulation score), daysPostRelapse (days since most recent relapse).}
+\item{visits}{A data frame consisting of 22 columns: ID, dateEDSS, EDSS, FSpyr (pyramidal FSS), FScrbl (cerebellar FSS), FSbstem (brainstem FSS), FSsens (sensory FSS), FSsph (bowel bladder FSS), FSvis (visual FSS), FScereb (cerebral FSS), FSamb (ambulation score), dateBlineVisit, bEDSS (baseline EDSS), bFSpyr (baseline pyramidal FSS), bFScrbl (baseline cerebellar FSS), bFSbstem (baseline brainstem FSS), bFSsens (baseline sensory FSS), bFSsph (baseline bowel bladder FSS), bFSvis (baseline visual FSS), bFScereb (baseline cerebral FSS), bFSamb (baseline ambulation score), daysPostRelapse (days since most recent relapse).}
 
-\item{minEDSS}{Minimum EDSS score to reach SPMS conversion.}
+\item{minEDSS}{Minimum EDSS score required to reach SPMS conversion.}
 
 \item{minFSpyr}{Minimum pyramidal FSS to reach SPMS conversion.}
 
-\item{tRelapse}{Minimum time in days from prior relapse to confirmation of EDSS progression.}
+\item{tRelapse}{Minimum time in days since the most recent relapse to EDSS assessment.}
 
 \item{tProgression}{SPMS confirmation period in days.}
 
 \item{tRegression}{Confirmation period for EDSS improvement in days.}
 
-\item{tRelProg}{Confirmation period (days) for rebaselining EDSS (after a relapse led to non-confirmed increase in EDSS).}
+\item{tRelProg}{Confirmation period (days) for re-baselining EDSS (after a relapse led to non-confirmed increase in EDSS).}
 }
 \value{
 A data frame.
 }
 \description{
-Diagnosis of conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition, including Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). Diagnosis is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, FSS, ambulation score, and days since most recent relapse.
+Identify conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition, including Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). The identification of SPMS is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, FSS, ambulation score, and days since most recent relapse.
+If a baseline EDSS score and corresponding FSS are not provided, these are determined as the first EDSS score and corresponding FSS recorded in the dataset, outside 30 days (the default) of a relapse.
+Following a relapse, the first EDSS score recorded in the dataset outside 30 days (the default) of a relapse, becomes the new baseline EDSS score.
+SPMS is sustained for the remainder of the follow-up, unless followed by two consecutive improvements in EDSS scores.
 }
 \examples{
 data(SampleData)

@@ -2,7 +2,7 @@
 % Please edit documentation in R/spmsDxnoFSS.R
 \name{spmsDx_no_fss}
 \alias{spmsDx_no_fss}
-\title{Diagnosis of secondary progressive multiple sclerosis without functional system scores and ambulation score}
+\title{Identification of secondary progressive multiple sclerosis without functional system scores and ambulation score}
 \usage{
 spmsDx_no_fss(
   visits,
@@ -14,23 +14,26 @@ spmsDx_no_fss(
 )
 }
 \arguments{
-\item{visits}{A dataframe consisting of 4 columns: ID, dateEDSS, EDSS, daysPostRelapse (days since most recent relapse).}
+\item{visits}{A dataframe consisting of 6 columns: ID, dateEDSS, EDSS, dateBlineVisit, bEDSS (baseline EDSS), daysPostRelapse (days since most recent relapse).}
 
-\item{minEDSS}{Minimum EDSS score to reach SPMS conversion.}
+\item{minEDSS}{Minimum EDSS score required to reach SPMS conversion.}
 
-\item{tRelapse}{Minimum time in days from prior relapse to confirmation of EDSS progression.}
+\item{tRelapse}{Minimum time in days since the most recent relapse to EDSS assessment.}
 
 \item{tProgression}{SPMS confirmation period in days.}
 
 \item{tRegression}{Confirmation period for EDSS improvement in days.}
 
-\item{tRelProg}{Confirmation period (days) for rebaselining EDSS (after a relapse led to non-confirmed increase in EDSS).}
+\item{tRelProg}{Confirmation period (days) for re-baselining EDSS (after a relapse led to non-confirmed increase in EDSS).}
 }
 \value{
 A data frame.
 }
 \description{
-Diagnosis of conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition without Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). Diagnosis is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, and days since most recent relapse.
+Identify conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition without Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). The identification of SPMS is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, and days since most recent relapse.
+If a baseline EDSS score is not provided, this is determined as the first EDSS score recorded in the dataset, outside 30 days (the default) of a relapse.
+Following a relapse, the first EDSS score recorded in the dataset outside 30 days (the default) of a relapse, becomes the new baseline EDSS score.
+SPMS is sustained for the remainder of the follow-up, unless followed by two consecutive improvements in EDSS scores.
 }
 \examples{
 data(SampleData)
@@ -41,5 +44,5 @@ Lorscheider J, et al. Brain 2016; 139 (9): 2395-2405.
 
 Brown JW, et al. JAMA 2019; 321 (2): 175-87.
 
-Lizak N, et al. JAMA neurology 2020; 77 (11): 1398-407.
+Lizak N, et al. JAMA Neurology 2020; 77 (11): 1398-407.
 }

@@ -5,7 +5,7 @@
 \alias{SampleData}
 \title{Expanded disability status scale (EDSS) score and functional system score (FSS) recorded at each visit}
 \format{
-A long data frame with 315 rows and 12 variables:
+A long data frame with 798 rows and 12 variables:
 \describe{
 \item{ID}{(character) patient ID}
 \item{dateEDSS}{(date YYYY-mm-dd) date of disability score}

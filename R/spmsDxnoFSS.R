@@ -1,17 +1,19 @@
-#' Diagnosis of secondary progressive multiple sclerosis without functional system scores and ambulation score
-#' @description Diagnosis of conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition without Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). Diagnosis is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, and days since most recent relapse.
+#' Identification of secondary progressive multiple sclerosis without functional system scores and ambulation score
+#' @description Identify conversion from relapsing-remitting multiple sclerosis (RRMS) to secondary progressive multiple sclerosis (SPMS), using the CORe definition without Functional System Scores (FSS) of Expanded Disability Status Scale (EDSS). The identification of SPMS is based on clinical visit records, each record including entries for patient code, visit date, EDSS score, and days since most recent relapse.
+#' If a baseline EDSS score is not provided, this is determined as the first EDSS score recorded in the dataset, outside 30 days (the default) of a relapse.
+#' Following a relapse, the first EDSS score recorded in the dataset outside 30 days (the default) of a relapse, becomes the new baseline EDSS score.
+#' SPMS is sustained for the remainder of the follow-up, unless followed by two consecutive improvements in EDSS scores.
 #' @references Lorscheider J, et al. Brain 2016; 139 (9): 2395-2405.
 #' @references Brown JW, et al. JAMA 2019; 321 (2): 175-87.
-#' @references Lizak N, et al. JAMA neurology 2020; 77 (11): 1398-407.
-#' @param visits A dataframe consisting of 4 columns: ID, dateEDSS, EDSS, daysPostRelapse (days since most recent relapse).
-#' @param minEDSS Minimum EDSS score to reach SPMS conversion.
-#' @param tRelapse Minimum time in days from prior relapse to confirmation of EDSS progression.
+#' @references Lizak N, et al. JAMA Neurology 2020; 77 (11): 1398-407.
+#' @param visits A dataframe consisting of 6 columns: ID, dateEDSS, EDSS, dateBlineVisit, bEDSS (baseline EDSS), daysPostRelapse (days since most recent relapse).
+#' @param minEDSS Minimum EDSS score required to reach SPMS conversion.
+#' @param tRelapse Minimum time in days since the most recent relapse to EDSS assessment.
 #' @param tProgression SPMS confirmation period in days.
 #' @param tRegression Confirmation period for EDSS improvement in days.
-#' @param tRelProg Confirmation period (days) for rebaselining EDSS (after a relapse led to non-confirmed increase in EDSS).
+#' @param tRelProg Confirmation period (days) for re-baselining EDSS (after a relapse led to non-confirmed increase in EDSS).
 #' @importFrom stats aggregate
-#' @importFrom utils head tail
-#' @importFrom dplyr %>% group_by mutate
+#' @importFrom dplyr %>% group_by mutate bind_cols bind_rows
 #' @examples
 #' data(SampleData)
 #' output<-spmsDx_no_fss(SampleData)
@@ -43,6 +45,7 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
   SPDXlist <- NULL
 
   visits$dateEDSS <- as.Date(visits$dateEDSS, "%Y-%m-%d")
+  visits$daysPostRelapse <- abs(visits$daysPostRelapse)
 
   vis <- visits[which(!is.na(visits$EDSS)), ]
   vis <- vis[order(vis$ID, as.numeric(vis$dateEDSS)), ]
@@ -58,7 +61,7 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
 
   for (p in 1:n) {
 
-    if ((p/n)==0.2||(p/n)==0.4|(p/n)==0.6|(p/n)==0.8|(p/n)==1.00) message("Processing patient #", p, "/", n, "  (", round(p*100/n, 2), "%)")
+    if ((p/n)==0.2|(p/n)==0.4|(p/n)==0.6|(p/n)==0.8|(p/n)==1.00) message("Processing patient #", p, "/", n, "  (", round(p*100/n, 2), "%)")
 
     pvisAll <- vis[which(vis$ID == patients$ID[p]), ]
 
@@ -67,16 +70,23 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
       pvis <- pvisAll
 
       pvis<-pvis[order(pvis$ID, pvis$dateEDSS),]
-      pvis$dateBlineVisit <- pvis$dateEDSS[1]
+
+      # Define bEDSS
+      if(all(is.na(pvis$bEDSS))) {
+        Visits.sn <- subset(pvis, pvis$daysPostRelapse>tRelapse | is.na(pvis$daysPostRelapse))
+        Visits.sn <- Visits.sn[order(Visits.sn$ID, as.numeric(Visits.sn$dateEDSS)), ]
+        pvis$dateBlineVisit <- as.Date(Visits.sn$dateEDSS[1])
+        for (k in 1:length(KurtzkeVars)) {
+          eval(parse(text = paste("pvis$b", KurtzkeVars[k], " <- Visits.sn[which(colnames(Visits.sn) == KurtzkeVars[k])][1, ]", sep = "")))
+        }
+        rm(k)
+      } else {
+        pvis$dateBlineVisit <- as.Date(pvis$dateBlineVisit, "%Y-%m-%d")
+      }
+
+
       pvis$daysPostBline <- as.numeric(pvis$dateEDSS - pvis$dateBlineVisit)
       pvis$daysPostBlineFinal <- as.numeric(max(pvis$daysPostBline))
-
-      # set baseline values
-
-      for (k in 1:length(KurtzkeVars)) {
-        eval(parse(text = paste("pvis$b", KurtzkeVars[k], " <- pvis[which(colnames(pvis) == KurtzkeVars[k])][1, ]", sep = "")))
-      }
-      rm(k)
 
       if (nrow(pvis) >= 3) {
 
@@ -92,17 +102,17 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
 
           pvisB$dEDSSvBline <- pvisB$EDSS - pvisB$bEDSS
 
-          # determine step EDSS progression & regression
+          # determine step EDSS worsening & improvement
 
           pvisB$progression <- 0
           pvisB$progression <- ifelse(pvisB$bEDSS == 0.0, ifelse(pvisB$dEDSSvBline >= 1.5 & pvisB$EDSS >= minEDSS, 1, 0), ifelse(pvisB$bEDSS < 6.0, ifelse(pvisB$dEDSSvBline >= 1 & pvisB$EDSS >= minEDSS, 1, 0), ifelse(pvisB$dEDSSvBline >= 0.5 & pvisB$EDSS >= minEDSS, 1, 0)))
           pvisB<- pvisB %>%
-            group_by(ID) %>%
-            mutate(flag_0 = cumsum(progression == 1)) %>%
-            group_by(ID, flag_0) %>%
-            mutate(conseq = ifelse(progression == 0, sum(progression == 0), 0)) %>%
-            mutate(progression = ifelse(progression == 0 & conseq>1, 0, 1)) %>%
-            ungroup()
+            dplyr::mutate(flag_0 = cumsum(progression == 1)) %>%
+            dplyr::group_by(flag_0) %>%
+            dplyr::mutate(conseq = ifelse(progression == 0, sum(progression == 0), 0)) %>%
+            dplyr::ungroup() %>%
+            dplyr::mutate(progression = ifelse(progression == 0 & conseq>1, 0, 1))
+
           pvisB$regression <- 0
           pvisB$regression <- ifelse(pvisB$dEDSSvBline <= -0.5, 1, 0)
 
@@ -115,10 +125,10 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
           pvisBP$finalProgVisnum <- NA
           pvisBP$finalRegVisnum <- NA
 
-          # determine sustained EDSS progression
+          # determine sustained EDSS worsening
 
           rNoProg <- which(pvisBP$progression %in% 0)
-          rNoRel <- which( (pvisBP$daysPostRelapse >= tRelapse) | is.na(pvisBP$daysPostRelapse) )
+          rNoRel <- which( (pvisBP$daysPostRelapse > tRelapse) | is.na(pvisBP$daysPostRelapse) )
           for (v in 1:nrow(pvisBP)) {
             if (pvisBP$progression[v] == 0) {
               pvisBP$finalProgVisnum[v] <- NA
@@ -130,7 +140,7 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
           pvisBP$daysProgression <- pvisBP$daysPostBline[match(pvisBP$finalProgVisnum, pvisBP$rownumber)] - pvisBP$daysPostBline
           pvisBP$daysProgression[which(is.na(pvisBP$daysProgression))] <- 0
 
-          # determine sustained EDSS regression
+          # determine sustained EDSS improvement
 
           rNoReg <- which(pvisBP$regression %in% 0)
           for (v in 1:nrow(pvisBP)) {
@@ -152,11 +162,10 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
 
           if (sum(pvisBP$progOrReg == 1) == 0) { break }
 
-          # identify relapses occurring after baseline and before the next progression or regression, and identify which are diagnostically significant
+          # identify relapses occurring after baseline and before the next worsening or improvement, and identify which are diagnostically significant
 
           pvisBPR <- pvisBP[1 : (which(pvisBP$progOrReg == 1)[1] - 1), ]
           pvisBPR <- pvisBPR[which(pvisBPR$dateEDSS != pvisBPR$dateBlineVisit[1]), ]
-          pvisBPR$postRelapseSig <- NA
           if (nrow(pvisBPR) >= 1 & pvisBP$progOrReg[1] != 1) {
             pvisBPR$postRelapseSig <- FALSE
             for (v in 1:nrow(pvisBPR)) {
@@ -220,7 +229,7 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
 
           pvisBPall <- pvisBP
 
-          # record whether an intervening relapse occured
+          # record whether an intervening relapse occurred
 
           pvisBP1 <- pvisBP[1, ]
           pvisBP1$interveningRelapse[which(is.na(pvisBP1$interveningRelapse))] <- FALSE
@@ -257,10 +266,14 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
             EDSSMinRRMS <- min(pvisAll$EDSS[which(pvisAll$dateEDSS < newrow$dateEDSS)])
             EDSSMinSPMS <- min(pvisAll$EDSS[which(pvisAll$dateEDSS >= newrow$dateEDSS)])
 
-            newrow <- cbind(newrow, datePreDxFinal, EDSSPreDxFinal, visitsRRMS, visitsSPMS, daysVisitIntervalRRMSMax, daysVisitIntervalPreDxFinal, EDSSMinRRMS, EDSSMinSPMS)
-            rm(datePreDxFinal, EDSSPreDxFinal, visitsRRMS, visitsSPMS, daysVisitIntervalRRMSMax, daysVisitIntervalPreDxFinal, EDSSMinRRMS, EDSSMinSPMS)
+            newvars<-cbind(datePreDxFinal, EDSSPreDxFinal, visitsRRMS, visitsSPMS, daysVisitIntervalRRMSMax, daysVisitIntervalPreDxFinal, EDSSMinRRMS, EDSSMinSPMS)
+            newvars<-data.frame(newvars)
 
-            SPDXlist <- rbind(SPDXlist, newrow)
+            newrow <- dplyr::bind_cols(newrow, newvars)
+            rm(newvars, datePreDxFinal, EDSSPreDxFinal, visitsRRMS, visitsSPMS, daysVisitIntervalRRMSMax, daysVisitIntervalPreDxFinal, EDSSMinRRMS, EDSSMinSPMS)
+
+            SPDXlist<-data.frame(SPDXlist)
+            SPDXlist <- dplyr::bind_rows(SPDXlist, newrow)
             rm(newrow)
             break
           } else {
@@ -319,5 +332,5 @@ spmsDx_no_fss <- function(visits, minEDSS = 4, tRelapse = 30, tProgression = 3*3
   return(SPDX)
 }
 globalVariables(c("ID", "dateEDSS", "EDSS", "FSpyr", "FSLeadConfirmed", "interveningRelapse", "daysPostRelapse", "dateBlineVisit", "bEDSS", "daysPostBline", "daysProgression", "dEDSSvBline", "date.obsFinal",
-                  "progression", "flag_0", "conseq", "pvisBPR", "pvisBPRN", "%>%", "group_by", "mutate", "ungroup"))
+                  "progression", "flag_0", "conseq", "pvisBPR", "pvisBPRN", "%>%", "mutate", "ungroup", "bind_cols", "bind_rows"))
 
