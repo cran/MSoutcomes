@@ -6,6 +6,7 @@
 #' @param Visits A data frame consisting of 6 columns: ID, dateEDSS, EDSS, daysPostRelapse (days since most recent relapse), bEDSS (baseline EDSS score), base.date (date of bEDSS).
 #' @param mconf Confirmation period (days) for EDSS worsening or improvement.
 #' @param tRelapse Minimum time in days since the most recent relapse to EDSS assessment.
+#' @importFrom dplyr %>% mutate case_when row_number
 #' @examples
 #' data(SampleData)
 #' output<-CDEseq(SampleData)
@@ -42,10 +43,13 @@ CDEseq <- function(Visits, mconf=3*30.25, tRelapse=30) {
       Visits.sav$base.date <- as.Date(Visits.sn.base$dateEDSS[1])
     } else {
       Visits.sav$base.date <- as.Date(Visits.sav$base.date, "%Y-%m-%d")
+      Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
+      Visits.sav<-rbind(Visits.sav[1,], Visits.sav)
+      Visits.sav<-Visits.sav %>% dplyr::mutate(dateEDSS=dplyr::case_when(row_number()==1~base.date, TRUE ~ dateEDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(EDSS=dplyr::case_when(row_number()==1~bEDSS, TRUE ~ EDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(daysPostRelapse=dplyr::case_when(row_number()==1~NA, TRUE ~ daysPostRelapse))
     }
 
-    # Remove visits recorded prior to the date of baseline
-    Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
     Visits.sav <- Visits.sav[order(Visits.sav$ID, as.numeric(Visits.sav$dateEDSS)), ]
 
     # Define timepoint
@@ -143,29 +147,38 @@ CDEseq <- function(Visits, mconf=3*30.25, tRelapse=30) {
   if (exists("min.reg")) { rm(min.reg) }
 
   # Output: CDEseq dataframe
-  CDWseqlist$conc <- paste(CDWseqlist$ID, CDWseqlist$dateEDSS)
-  CDWseqlist <- CDWseqlist[!duplicated(CDWseqlist$conc),]
-  CDWseqlist <- subset(CDWseqlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.prog))
-  CDWseqlist <- CDWseqlist[which(as.numeric(as.character(CDWseqlist$timepoint))>0),]
-  CDWseqlist <- subset(CDWseqlist, select= -timepoint)
-  rownames(CDWseqlist) <- NULL
+  if (is.null(CDWseqlist)) {
+    CDWseqlist <- data.frame()
+  } else {
+    CDWseqlist$conc <- paste(CDWseqlist$ID, CDWseqlist$dateEDSS)
+    CDWseqlist <- CDWseqlist[!duplicated(CDWseqlist$conc),]
+    CDWseqlist <- subset(CDWseqlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.prog))
+    CDWseqlist <- CDWseqlist[which(as.numeric(as.character(CDWseqlist$timepoint))>0),]
+    CDWseqlist <- subset(CDWseqlist, select= -timepoint)
+    rownames(CDWseqlist) <- NULL
 
-  CDIseqlist$conc <- paste(CDIseqlist$ID, CDIseqlist$dateEDSS)
-  CDIseqlist <- CDIseqlist[!duplicated(CDIseqlist$conc),]
-  CDIseqlist <- subset(CDIseqlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.reg))
-  CDIseqlist <- CDIseqlist[which(as.numeric(as.character(CDIseqlist$timepoint))>0),]
-  CDIseqlist <- subset(CDIseqlist, select= -timepoint)
-  rownames(CDIseqlist) <- NULL
+    attr(CDWseqlist, 'mconf') <- mconf
+    attr(CDWseqlist, 'tRelapse') <- tRelapse
+    attr(CDWseqlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+  }
 
-  attr(CDWseqlist, 'mconf') <- mconf
-  attr(CDWseqlist, 'tRelapse') <- tRelapse
-  attr(CDWseqlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+  if (is.null(CDIseqlist)) {
+    CDIseqlist <- data.frame()
+  } else {
+    CDIseqlist$conc <- paste(CDIseqlist$ID, CDIseqlist$dateEDSS)
+    CDIseqlist <- CDIseqlist[!duplicated(CDIseqlist$conc),]
+    CDIseqlist <- subset(CDIseqlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.reg))
+    CDIseqlist <- CDIseqlist[which(as.numeric(as.character(CDIseqlist$timepoint))>0),]
+    CDIseqlist <- subset(CDIseqlist, select= -timepoint)
+    rownames(CDIseqlist) <- NULL
 
-  attr(CDIseqlist, 'mconf') <- mconf
-  attr(CDIseqlist, 'tRelapse') <- tRelapse
-  attr(CDIseqlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+    attr(CDIseqlist, 'mconf') <- mconf
+    attr(CDIseqlist, 'tRelapse') <- tRelapse
+    attr(CDIseqlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+  }
 
   CDEseqlist <- list(CDWseqlist, CDIseqlist)
+
   return(CDEseqlist)
 }
 

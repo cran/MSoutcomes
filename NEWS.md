@@ -3,6 +3,17 @@ output:
   html_document: default
   pdf_document: default
 ---
+# MSoutcomes 0.2.1
+
+* Bug fixes
+
+  * `CDW()` function:  correctly identifies CDW events when a baseline EDSS score is provided.
+  * `CDI()` function:  correctly identifies CDI events when a baseline EDSS score is provided.
+  * `CDEseq()` function:  correctly identifies sequential CDW ad CDI events when a baseline EDSS score is provided.
+  * `PIRA()` function:  correctly identifies PIRA events when a baseline EDSS score is provided.
+
+
+
 # MSoutcomes 0.2.0
 
 * New functions

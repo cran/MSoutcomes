@@ -8,6 +8,7 @@
 #' @param mconf Confirmation period (days) for EDSS improvement.
 #' @param tRelapse Minimum time in days since the most recent relapse to EDSS assessment.
 #' @param sustained If TRUE, the default, identifies only those EDSS improvement events sustained for the remaining recorded follow-up.
+#' @importFrom dplyr %>% mutate case_when row_number
 #' @examples
 #' data(SampleData)
 #' output<-CDI(SampleData)
@@ -43,10 +44,13 @@ CDI <- function(Visits, mconf=3*30.25, tRelapse=30, sustained=TRUE) {
       Visits.sav$base.date <- as.Date(Visits.sn.base$dateEDSS[1])
     } else {
       Visits.sav$base.date <- as.Date(Visits.sav$base.date, "%Y-%m-%d")
+      Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
+      Visits.sav<-rbind(Visits.sav[1,], Visits.sav)
+      Visits.sav<-Visits.sav %>% dplyr::mutate(dateEDSS=dplyr::case_when(row_number()==1~base.date, TRUE ~ dateEDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(EDSS=dplyr::case_when(row_number()==1~bEDSS, TRUE ~ EDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(daysPostRelapse=dplyr::case_when(row_number()==1~NA, TRUE ~ daysPostRelapse))
     }
 
-    # Remove visits recorded prior to the date of baseline
-    Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
     Visits.sav <- Visits.sav[order(Visits.sav$ID, as.numeric(Visits.sav$dateEDSS)), ]
 
     # Define timepoint
@@ -103,17 +107,21 @@ CDI <- function(Visits, mconf=3*30.25, tRelapse=30, sustained=TRUE) {
   if (exists("min.reg")) { rm(min.reg) }
 
   # Output: CDI dataframe
-  CDIlist$conc <- paste(CDIlist$ID, CDIlist$dateEDSS)
-  CDIlist <- CDIlist[!duplicated(CDIlist$conc),]
-  CDIlist <- subset(CDIlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.reg))
-  CDIlist <- CDIlist[which(as.numeric(as.character(CDIlist$timepoint))>0),]
-  CDIlist <- subset(CDIlist, select= -timepoint)
-  rownames(CDIlist) <- NULL
+  if (is.null(CDIlist)) {
+    CDIlist <- data.frame()
+  } else {
+    CDIlist$conc <- paste(CDIlist$ID, CDIlist$dateEDSS)
+    CDIlist <- CDIlist[!duplicated(CDIlist$conc),]
+    CDIlist <- subset(CDIlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.reg))
+    CDIlist <- CDIlist[which(as.numeric(as.character(CDIlist$timepoint))>0),]
+    CDIlist <- subset(CDIlist, select= -timepoint)
+    rownames(CDIlist) <- NULL
 
-  attr(CDIlist, 'mconf') <- mconf
-  attr(CDIlist, 'tRelapse') <- tRelapse
-  attr(CDIlist, 'sustained') <- sustained
-  attr(CDIlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+    attr(CDIlist, 'mconf') <- mconf
+    attr(CDIlist, 'tRelapse') <- tRelapse
+    attr(CDIlist, 'sustained') <- sustained
+    attr(CDIlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+  }
 
   return(CDIlist)
 }

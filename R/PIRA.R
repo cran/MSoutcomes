@@ -9,6 +9,7 @@
 #' @param mconf Confirmation period (days) for EDSS progression.
 #' @param tRelapse Minimum time in days since the most recent relapse to EDSS assessment.
 #' @param sustained If TRUE, the default, identifies only those PIRA events sustained for the remaining recorded follow-up.
+#' @importFrom dplyr %>% mutate case_when row_number
 #' @examples
 #' data(SampleData)
 #' output<-PIRA(SampleData)
@@ -44,10 +45,13 @@ PIRA <- function(Visits, mconf=3*30.25, tRelapse=30, sustained=TRUE) {
       Visits.sav$base.date <- as.Date(Visits.sn$dateEDSS[1])
     } else {
       Visits.sav$base.date <- as.Date(Visits.sav$base.date, "%Y-%m-%d")
+      Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
+      Visits.sav<-rbind(Visits.sav[1,], Visits.sav)
+      Visits.sav<-Visits.sav %>% dplyr::mutate(dateEDSS=dplyr::case_when(row_number()==1~base.date, TRUE ~ dateEDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(EDSS=dplyr::case_when(row_number()==1~bEDSS, TRUE ~ EDSS))
+      Visits.sav<-Visits.sav %>% dplyr::mutate(daysPostRelapse=dplyr::case_when(row_number()==1~NA, TRUE ~ daysPostRelapse))
     }
 
-    # Remove visits recorded prior to the date of baseline
-    Visits.sav <- subset(Visits.sav, Visits.sav$dateEDSS>=Visits.sav$base.date)
     Visits.sav <- Visits.sav[order(Visits.sav$ID, as.numeric(Visits.sav$dateEDSS)), ]
 
     # Define timepoint
@@ -124,17 +128,21 @@ PIRA <- function(Visits, mconf=3*30.25, tRelapse=30, sustained=TRUE) {
   if (exists("min2")) { rm(min2) }
   if (exists("min.prog")) { rm(min.prog) }
 
-  # Output: CDW dataframe
-  PIRAlist$conc <- paste(PIRAlist$ID, PIRAlist$dateEDSS)
-  PIRAlist <- PIRAlist[!duplicated(PIRAlist$conc),]
-  PIRAlist <- subset(PIRAlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.prog))
-  PIRAlist <- PIRAlist[which(as.numeric(as.character(PIRAlist$timepoint))>0),]
-  rownames(PIRAlist) <- NULL
+  # Output: PIRA dataframe
+  if (is.null(PIRAlist)) {
+    PIRAlist <- data.frame()
+  } else {
+    PIRAlist$conc <- paste(PIRAlist$ID, PIRAlist$dateEDSS)
+    PIRAlist <- PIRAlist[!duplicated(PIRAlist$conc),]
+    PIRAlist <- subset(PIRAlist, select=c(ID, bEDSS, base.date, EDSS, dateEDSS, dEDSS, timepoint, sust.prog))
+    PIRAlist <- PIRAlist[which(as.numeric(as.character(PIRAlist$timepoint))>0),]
+    rownames(PIRAlist) <- NULL
 
-  attr(PIRAlist, 'mconf') <- mconf
-  attr(PIRAlist, 'tRelapse') <- tRelapse
-  attr(PIRAlist, 'sustained') <- sustained
-  attr(PIRAlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+    attr(PIRAlist, 'mconf') <- mconf
+    attr(PIRAlist, 'tRelapse') <- tRelapse
+    attr(PIRAlist, 'sustained') <- sustained
+    attr(PIRAlist, 'timestamp') <- paste(format(Sys.time(),"%Y%m%d%H%M"))
+  }
 
   return(PIRAlist)
 }
